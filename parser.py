@@ -1,0 +1,339 @@
+class ASTNode:
+    pass
+
+class Program(ASTNode):
+    def __init__(self, statements):
+        self.statements = statements
+
+    def __repr__(self):
+        return f"Program({self.statements!r})"
+
+class LetStatement(ASTNode):
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    def __repr__(self):
+        return f"LetStatement({self.name!r}, {self.value!r})"
+
+class MoveStatement(ASTNode):
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    def __repr__(self):
+        return f"MoveStatement({self.name!r}, {self.value!r})"
+
+class ReignStatement(ASTNode):
+    def __init__(self, condition, body):
+        self.condition = condition
+        self.body = body
+
+    def __repr__(self):
+        return (
+            f"ReignStatement("
+            f"{self.condition!r}, "
+            f"{self.body!r})"
+        )
+
+class IfStatement(ASTNode):
+    def __init__(self, condition, then_branch,elif_branches=None, else_branch=None):
+        self.condition = condition
+        self.then_branch = then_branch
+        self.else_branch = else_branch
+        self.elif_branches = elif_branches or []
+
+    def __repr__(self):
+        return (
+            f"IfStatement("
+            f"{self.condition!r}"
+            f"{self.then_branch!r}"
+            f"{self.elif_branches!r}"
+            f"{self.else_branch!r})"
+        )
+
+class DepartStatement(ASTNode):
+    def __repr__(self):
+        return "DepartStatement()"
+
+class UtterStatement(ASTNode):
+    def __init__(self, expression):
+        self.expression = expression
+
+    def __repr__(self):
+        return f"UtterStatement({self.expression!r})"
+
+class Literal(ASTNode):
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return f"Literal({self.value!r})"
+
+class Identifier(ASTNode):
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return f"Identifier({self.name!r})"
+
+class BinaryExpression(ASTNode):
+    def __init__(self, left, operator, right):
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    def __repr__(self):
+        return (
+            f"BinaryExpression("
+            f"{self.left!r}, "
+            f"{self.operator!r}, "
+            f"{self.right!r}) "
+        )
+
+class CallExpression(ASTNode):
+    def __init__(self, callee, arguments):
+        self.callee = callee
+        self.arguments = arguments
+
+    def __repr__(self):
+        return (
+            f"CallExpression("
+            f"{self.callee!r}"
+            f"{self.arguments!r})"
+        )
+
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.position = 0
+
+    def parse(self):
+        statements = []
+
+        while not self.check("EOF"):
+            statements.append(self.statement())
+
+        return Program(statements)
+
+    def statement(self):
+        if self.match("LET"):
+            return self.let_statement()
+
+        if self.match("UTTER"):
+            return self.utter_statement()
+        
+        if self.match("MOVE"):
+            return self.move_statement()
+
+        if self.match("REIGN"):
+            return self.reign_statement()
+        
+        if self.match("IF"):
+            return self.if_statement()
+        
+        if self.match("DEPART"):
+            return DepartStatement()
+
+        raise SyntaxError(
+            f"Unexpected token: {self.current().type} "
+            f"at line {self.current().line}"
+        )
+
+    def block(self):
+        self.consume("COLON", "Expected  ':' after statement.")
+
+        self.consume("INDENT", "Expected indented block.")
+
+        statements = []
+
+        while not self.check("DEDENT", "EOF"):
+            statements.append(self.statement())
+
+        self.consume("DEDENT", "Expected end of block.")
+
+        return statements
+
+    def let_statement(self):
+        name = self.consume(
+            "IDENTIFIER",
+            "Expected variable name after 'let'."
+        )
+
+        self.consume(
+            "EQUAL",
+            "Expected '=' after variable name."
+        )
+
+        value = self.expression()
+
+        return LetStatement(
+            name.value,
+            value
+        )
+
+    def utter_statement(self):
+        expression = self.expression()
+
+        return UtterStatement(expression)
+
+    def move_statement(self):
+        name = self.consume(
+            "IDENTIFIER",
+            "Expected variable name after 'move'."
+        )
+
+        self.consume(
+            "EQUAL",
+            "Expected '=' after variable name."
+        )
+
+        value = self.expression()
+        return MoveStatement(name.value, value)
+
+    def reign_statement(self):
+        condition = self.expression()
+        body = self.block()
+
+        return ReignStatement(condition, body)
+
+    def if_statement(self):
+        condition = self.expression()
+        then_branch = self.block()
+
+        elif_branches = []
+
+        while self.match("ELIF"):
+            elif_condition = self.expression()
+            elif_body = self.block()
+
+            elif_branches.append((elif_condition, elif_body))
+
+        else_branch = None
+
+        if self.match("ELSE"):
+            else_branch = self.block()
+
+        return IfStatement(condition, then_branch,elif_branches, else_branch)
+
+    def expression(self):
+        return self.comparison()
+
+    def comparison(self):
+        expression = self.term()
+
+        while self.check(
+            "EQUAL_EQUAL",
+            "NOT_EQUAL",
+            "LESS",
+            "LESS_EQUAL",
+            "GREATER",
+            "GREATER_EQUAL",
+        ):
+
+            operator = self.advance()
+            right = self.term()
+
+            expression = BinaryExpression(expression, operator.type, right)
+
+        return expression
+
+    def term(self):
+        expression = self.factor()
+
+        while self.check("PLUS", "MINUS"):
+            operator = self.advance()
+            right = self.factor()
+
+            expression = BinaryExpression(expression, operator.type, right)
+
+        return expression
+
+    def factor(self):
+        expression = self.primary()
+
+        while self.check("STAR", "SLASH"):
+            operator = self.advance()
+            right = self.primary()
+
+            expression = BinaryExpression(expression, operator.type, right)
+
+        return expression
+
+    def primary(self):
+        if self.match("NUMBER"):
+            return Literal(self.previous().value)
+
+        if self.match("STRING"):
+            return Literal(self.previous().value)
+
+        if self.match("IDENTIFIER"):
+            expression = Identifier(self.previous().value)
+
+            while self.match("LEFT_PAREN"):
+                arguments = []
+
+                if not self.check("RIGHT_PAREN"):
+                    arguments.append(self.expression())
+
+                    while self.match("COMMA"):
+                        arguments.append(self.expression())
+
+                self.consume(
+                    "RIGHT_PAREN",
+                    "Expected ')' after arguments."
+                )
+
+                expression = CallExpression(
+                    expression,
+                    arguments
+                )
+
+            return expression
+
+        if self.match("LEFT_PAREN"):
+            expression = self.expression()
+
+            self.consume(
+                "RIGHT_PAREN",
+                "Expected ')' after expression."
+            )
+
+            return expression
+
+        raise SyntaxError(
+            f"Expected expression, got "
+            f"{self.current().type} "
+            f"at line {self.current().line}"
+        )
+
+    def match(self, *types):
+        if self.check(*types):
+            self.advance()
+            return True
+
+        return False
+
+    def check(self, *types):
+        return self.current().type in types
+
+    def advance(self):
+        if not self.check("EOF"):
+            self.position += 1
+        return self.previous()
+
+    def consume(self, token_type, message):
+        if self.check(token_type):
+            return self.advance()
+
+        raise SyntaxError(
+            f"{message} "
+            f"Got {self.current().type} "
+            f"at line {self.current().line}"
+        )
+
+    def current(self):
+        return self.tokens[self.position]
+
+    def previous(self):
+        return self.tokens[self.position - 1]
