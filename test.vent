@@ -1,4 +1,0 @@
-ordain add(a, b):
-    yield a + b
-
-utter add(10, 210)
