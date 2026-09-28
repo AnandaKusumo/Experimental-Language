@@ -143,6 +143,16 @@ class Lexer:
                     self.position += 2
                     continue
 
+                if two_chars == "<-":
+                    self.tokens.append(Token("LEFT_ARROW", "<-", self.line))
+                    self.position += 2
+                    continue
+
+                if two_chars == "->":
+                    self.tokens.append(Token("RIGHT_ARROW", "->", self.line))
+                    self.position += 2
+                    continue
+
             operators = {
                 "=": "EQUAL",
                 "+": "PLUS",

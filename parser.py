@@ -52,9 +52,27 @@ class IfStatement(ASTNode):
             f"{self.else_branch!r})"
         )
 
+class OrdainStatement(ASTNode):
+    def __init__(self, name, parameters, body):
+        self.name = name
+        self.parameters = parameters
+        self.body = body
+
+    def __repr__(self):
+        return (
+            f"OrdainStatement("
+            f"{self.name!r},"
+            f"{self.parameters!r},"
+            f"{self.body!r})"
+        )
+
 class DepartStatement(ASTNode):
     def __repr__(self):
         return "DepartStatement()"
+
+class ProceedStatement(ASTNode):
+    def __repr__(self):
+        return "ProceedStatement()"
 
 class UtterStatement(ASTNode):
     def __init__(self, expression):
@@ -63,12 +81,26 @@ class UtterStatement(ASTNode):
     def __repr__(self):
         return f"UtterStatement({self.expression!r})"
 
+class YieldStatement(ASTNode):
+    def __init__(self, expression=None):
+        self.expression = expression
+
+    def __repr__(self):
+        return f"YieldStatement({self.expression!r})"
+
 class Literal(ASTNode):
     def __init__(self, value):
         self.value = value
 
     def __repr__(self):
         return f"Literal({self.value!r})"
+
+class ListLiteral(ASTNode):
+    def __init__(self, elements):
+        self.elements = elements
+
+    def __repr__(self):
+        return f"ListLiteral({self.elements!r})"
 
 class Identifier(ASTNode):
     def __init__(self, name):
@@ -91,6 +123,13 @@ class BinaryExpression(ASTNode):
             f"{self.right!r}) "
         )
 
+class ExpressionStatement(ASTNode):
+    def __init__(self, expression):
+        self.expression = expression
+
+    def __repr__(self):
+        return f"ExpressionStatement({self.expression!r})"
+
 class CallExpression(ASTNode):
     def __init__(self, callee, arguments):
         self.callee = callee
@@ -101,6 +140,32 @@ class CallExpression(ASTNode):
             f"CallExpression("
             f"{self.callee!r}"
             f"{self.arguments!r})"
+        )
+
+class IndexExpression(ASTNode):
+    def __init__(self, object_, index):
+        self.object = object_
+        self.index = index
+
+    def __repr__(self):
+        return (
+            f"IndexExpression("
+            f"{self.object!r},"
+            f"{self.index!r})"
+        )
+    
+class SliceExpression(ASTNode):
+    def __init__(self, object_, start, end):
+        self.object = object_
+        self.start = start
+        self.end = end
+
+    def __repr__(self):
+        return (
+            f"SliceExpression("
+            f"{self.object!r},"
+            f"{self.start!r},"
+            f"{self.end!r})"
         )
 
 class Parser:
@@ -126,6 +191,12 @@ class Parser:
         if self.match("MOVE"):
             return self.move_statement()
 
+        if self.match("ORDAIN"):
+            return self.ordain_statement()
+
+        if self.match("YIELD"):
+            return self.yield_statement()
+        
         if self.match("REIGN"):
             return self.reign_statement()
         
@@ -134,11 +205,11 @@ class Parser:
         
         if self.match("DEPART"):
             return DepartStatement()
+        
+        if self.match("PROCEED"):
+            return ProceedStatement()
 
-        raise SyntaxError(
-            f"Unexpected token: {self.current().type} "
-            f"at line {self.current().line}"
-        )
+        return ExpressionStatement(self.expression())
 
     def block(self):
         self.consume("COLON", "Expected  ':' after statement.")
@@ -161,8 +232,8 @@ class Parser:
         )
 
         self.consume(
-            "EQUAL",
-            "Expected '=' after variable name."
+            "LEFT_ARROW",
+            "Expected '<-' after variable name."
         )
 
         value = self.expression()
@@ -184,8 +255,8 @@ class Parser:
         )
 
         self.consume(
-            "EQUAL",
-            "Expected '=' after variable name."
+            "RIGHT_ARROW",
+            "Expected '->' after variable name."
         )
 
         value = self.expression()
@@ -196,6 +267,13 @@ class Parser:
         body = self.block()
 
         return ReignStatement(condition, body)
+
+    def yield_statement(self):
+        if self.check("DEDENT", "EOF"):
+            return YieldStatement()
+        
+        expression = self.expression()
+        return YieldStatement(expression)
 
     def if_statement(self):
         condition = self.expression()
@@ -215,6 +293,44 @@ class Parser:
             else_branch = self.block()
 
         return IfStatement(condition, then_branch,elif_branches, else_branch)
+
+    def ordain_statement(self):
+        name = self.consume(
+            "IDENTIFIER",
+            "Expected function name after 'ordain'."
+        )
+
+        self.consume(
+            "LEFT_PAREN",
+            "Expected '(' after function name."
+        )
+
+        parameters = []
+
+        if not self.check("RIGHT_PAREN"):
+            parameters.append(
+                self.consume(
+                    "IDENTIFIER",
+                    "Expected parameter name"
+                ).value
+            )
+
+            while self.match("COMMA"):
+                parameters.append(
+                    self.consume(
+                        "IDENTIFIER",
+                        "Expected parameter name after ','."
+                    ).value
+                )
+
+        self.consume(
+            "RIGHT_PAREN",
+            "Expected ')' after parameters"
+        )
+
+        body = self.block()
+
+        return OrdainStatement(name.value, parameters, body)
 
     def expression(self):
         return self.comparison()
@@ -267,10 +383,42 @@ class Parser:
         if self.match("STRING"):
             return Literal(self.previous().value)
 
-        if self.match("IDENTIFIER"):
+        if self.match("LEFT_BRACKET"):
+            elements = []
+
+            if not self.check("RIGHT_BRACKET"):
+                elements.append(self.expression())
+
+                while self.match("COMMA"):
+                    elements.append(self.expression())
+
+            self.consume(
+                "RIGHT_BRACKET",
+                "Expected ']' after list."
+            )
+
+            expression = ListLiteral(elements)
+
+        elif self.match("IDENTIFIER"):
             expression = Identifier(self.previous().value)
 
-            while self.match("LEFT_PAREN"):
+        elif self.match("LEFT_PAREN"):
+            expression = self.expression()
+
+            self.consume(
+                "RIGHT_PAREN",
+                "Expected ')' after expression."
+            )
+
+        else:
+            raise SyntaxError(
+                f"Expected expression, got"
+                f"{self.current().type} "
+                f"at line {self.current().line}"
+            )
+
+        while True:
+            if self.match("LEFT_PAREN"):
                 arguments = []
 
                 if not self.check("RIGHT_PAREN"):
@@ -284,28 +432,33 @@ class Parser:
                     "Expected ')' after arguments."
                 )
 
-                expression = CallExpression(
-                    expression,
-                    arguments
+                expression = CallExpression(expression, arguments)
+
+            elif self.match("LEFT_BRACKET"):
+                start = None
+                end = None
+
+                if not self.check("COLON", "RIGHT_BRACKET"):
+                    start = self.expression()
+
+                if self.match("COLON"):
+                    if not self.check("RIGHT_BRACKET"):
+                        end = self.expression()
+
+                    expression = SliceExpression(expression, start, end)
+
+                else:
+                    expression = IndexExpression(expression, start)
+
+                self.consume(
+                    "RIGHT_BRACKET",
+                    "Expected ']' after index or slice."
                 )
 
-            return expression
+            else:
+                break
 
-        if self.match("LEFT_PAREN"):
-            expression = self.expression()
-
-            self.consume(
-                "RIGHT_PAREN",
-                "Expected ')' after expression."
-            )
-
-            return expression
-
-        raise SyntaxError(
-            f"Expected expression, got "
-            f"{self.current().type} "
-            f"at line {self.current().line}"
-        )
+        return expression
 
     def match(self, *types):
         if self.check(*types):

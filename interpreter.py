@@ -1,11 +1,81 @@
-from parser import (Program, LetStatement, MoveStatement,ReignStatement,IfStatement, DepartStatement, UtterStatement, Literal, Identifier, BinaryExpression, CallExpression)
+from parser import (Program, LetStatement, MoveStatement,ReignStatement,IfStatement, DepartStatement, ProceedStatement, UtterStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement)
 
 class BreakSignal(Exception):
     pass
 
+class ContinueSignal(Exception):
+    pass
+
+class ReturnSignal(Exception):
+    def __init__(self, value):
+        self.value = value
+
+class Environment:
+    def __init__(self, parent=None):
+        self.values = {}
+        self.parent = parent
+
+    def define(self, name, value):
+        self.values[name]= value
+
+    def get(self, name):
+        if name in self.values:
+            return self.values[name]
+
+        if self.parent is not None:
+            return self.parent.get(name)
+
+        raise RuntimeError(f"Undefined Variable: {name}")
+
+    def assign(self, name, value):
+        if name in self.values:
+            self.values[name] = value
+            return
+
+        if self.parent is not None:
+            self.parent.assign(name, value)
+            return
+
+        raise RuntimeError(f"Undefined variable: {name}")
+
+class VenturisFunction:
+    def __init__(self, name, parameters, body, interpreter):
+        self.name = name
+        self.parameters = parameters
+        self.body = body
+        self.interpreter = interpreter
+
+    def call(self, arguments):
+        if len(arguments) != len(self.parameters):
+            raise RuntimeError(
+                f"{self.name}() expects "
+                f"{len(self.parameters)} argument(s), "
+                f"got {len(arguments)}."
+            )
+
+        previous_environment = self.interpreter.environment
+
+        local_environment = Environment(parent=previous_environment)
+
+        for parameter, argument in zip(self.parameters, arguments):
+            local_environment.define(parameter, argument)
+
+        self.interpreter.environment = local_environment
+
+        try:
+            self.interpreter.execute_block(self.body)
+
+        except ReturnSignal as signal:
+            return signal.value
+        
+        finally:
+            self.interpreter.environment = previous_environment
+
+        return None
+
 class Interpreter:
     def __init__(self):
-        self.environment = {}
+        self.environment = Environment()
 
     def run(self, program):
         for statement in program.statements:
@@ -18,16 +88,31 @@ class Interpreter:
     def execute(self, statement):
         if isinstance(statement, LetStatement):
             value = self.evaluate(statement.value)
-            self.environment[statement.name] = value
+            self.environment.define(statement.name, value)
             return
         
         if isinstance(statement, MoveStatement):
-            if statement.name not in self.environment:
-                raise RuntimeError(f"Undefined variable: {statement.name}")
-            
             value = self.evaluate(statement.value)
-            self.environment[statement.name] = value
+            self.environment.assign(statement.name, value)
             return
+
+        if isinstance(statement, OrdainStatement):
+            function = VenturisFunction(
+                statement.name,
+                statement.parameters,
+                statement.body,
+                self
+            )
+
+            self.environment.define(statement.name, function)
+            return
+
+        if isinstance(statement, YieldStatement):
+            if statement.expression is None:
+                raise ReturnSignal(None)
+
+            value = self.evaluate(statement.expression)
+            raise ReturnSignal(value)
 
         if isinstance(statement, UtterStatement):
             value = self.evaluate(statement.expression)
@@ -39,12 +124,18 @@ class Interpreter:
                 try:
                     self.execute_block(statement.body)
 
+                except ContinueSignal:
+                    continue
+
                 except BreakSignal:
                     break
             return
 
         if isinstance(statement, DepartStatement):
             raise BreakSignal()
+        
+        if isinstance(statement, ProceedStatement):
+            raise ContinueSignal()
 
         if isinstance(statement, IfStatement):
             condition = self.evaluate(statement.condition)
@@ -63,6 +154,10 @@ class Interpreter:
 
             return
 
+        if isinstance(statement, ExpressionStatement):
+            self.evaluate(statement.expression)
+            return
+
         raise RuntimeError(f"Unknown statement {type(statement).__name__}")
 
     def evaluate(self, node):
@@ -70,12 +165,28 @@ class Interpreter:
             return node.value
 
         if isinstance(node, Identifier):
-            if node.name not in self.environment:
-                raise RuntimeError(f"Undefined variable:{node.name}")
-            return self.environment[node.name]
+            return self.environment.get(node.name)
+
+        if isinstance(node, ListLiteral):
+            return [self.evaluate(element) for element in node.elements]
 
         if isinstance(node, BinaryExpression):
             return self.evaluate_binary(node)
+
+        if isinstance(node, IndexExpression):
+            object_ = self.evaluate(node.object)
+            index = self.evaluate(node.index)
+
+            return object_[index]
+
+        if isinstance(node, SliceExpression):
+            object_ = self.evaluate(node.object)
+
+            start = (self.evaluate(node.start) if node.start is not None else None)
+
+            end = (self.evaluate(node.end) if node.end is not None else None)
+
+            return object_[start:end]
         
         if isinstance(node, CallExpression):
             return self.evaluate_call(node)
@@ -120,7 +231,7 @@ class Interpreter:
 
     def evaluate_call(self, node):
         if not isinstance(node.callee, Identifier):
-            raise RuntimeError("Can only call functions by name.")
+            raise TypeError("Can only call functions by name.")
 
         function_name = node.callee.name
 
@@ -134,4 +245,12 @@ class Interpreter:
 
             return input(prompt)
 
-        raise RuntimeError("Undefined function: {function_name}")
+        try:
+            function = self.environment.get(function_name)
+        except RuntimeError:
+            raise RuntimeError(f"Undefined function: {function_name}")
+
+        if not isinstance(function, VenturisFunction):
+            raise TypeError(f"{function_name} is not a function")
+
+        return function.call(arguments)

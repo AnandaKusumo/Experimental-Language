@@ -1,8 +1,8 @@
 import sys
 
+from interpreter import Interpreter
 from lexer import Lexer
 from parser import Parser
-from interpreter import Interpreter
 
 VERSION = "0.1.0"
 
