@@ -36,19 +36,19 @@ class ReignStatement(ASTNode):
             f"{self.body!r})"
         )
 
-class IfStatement(ASTNode):
-    def __init__(self, condition, then_branch,elif_branches=None, else_branch=None):
+class WhereStatement(ASTNode):
+    def __init__(self, condition, then_branch, otherwise_branches=None, else_branch=None):
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
-        self.elif_branches = elif_branches or []
+        self.otherwise_branches = otherwise_branches or []
 
     def __repr__(self):
         return (
-            f"IfStatement("
+            f"WhereStatement("
             f"{self.condition!r}"
             f"{self.then_branch!r}"
-            f"{self.elif_branches!r}"
+            f"{self.otherwise_branches!r}"
             f"{self.else_branch!r})"
         )
 
@@ -200,8 +200,8 @@ class Parser:
         if self.match("REIGN"):
             return self.reign_statement()
         
-        if self.match("IF"):
-            return self.if_statement()
+        if self.match("WHERE"):
+            return self.where_statement()
         
         if self.match("DEPART"):
             return DepartStatement()
@@ -275,24 +275,23 @@ class Parser:
         expression = self.expression()
         return YieldStatement(expression)
 
-    def if_statement(self):
+    def where_statement(self):
         condition = self.expression()
         then_branch = self.block()
 
-        elif_branches = []
-
-        while self.match("ELIF"):
-            elif_condition = self.expression()
-            elif_body = self.block()
-
-            elif_branches.append((elif_condition, elif_body))
-
+        otherwise_branches = []
         else_branch = None
 
-        if self.match("ELSE"):
-            else_branch = self.block()
+        while self.match("OTHERWISE"):
+            if self.match("WHERE"):
+                otherwise_condition = self.expression()
+                otherwise_body = self.block()
+                otherwise_branches.append((otherwise_condition, otherwise_body))
+            else:
+                else_branch = self.block()
+                break
 
-        return IfStatement(condition, then_branch,elif_branches, else_branch)
+        return WhereStatement(condition, then_branch, otherwise_branches, else_branch)
 
     def ordain_statement(self):
         name = self.consume(
@@ -339,7 +338,7 @@ class Parser:
         expression = self.term()
 
         while self.check(
-            "EQUAL_EQUAL",
+            "BE",
             "NOT_EQUAL",
             "LESS",
             "LESS_EQUAL",

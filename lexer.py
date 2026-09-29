@@ -13,9 +13,8 @@ KEYWORDS = {
     "conn": "CONN",  # establish a connection
 
     # Conditional statements
-    "if": "IF",  # begin a conditional statement
-    "elif": "ELIF",
-    "else": "ELSE",  # alternative branch of a condition
+    "where": "WHERE",  # begin a conditional statement
+    "otherwise": "OTHERWISE", # alternative branch of a condition
 
     # Loops
     "reign": "REIGN",  # begin a loop
@@ -122,11 +121,6 @@ class Lexer:
 
             if self.position + 1 < len(self.source):
                 two_chars = self.source[self.position:self.position + 2]
-
-                if two_chars == "==":
-                    self.tokens.append(Token("EQUAL_EQUAL", "==", self.line))
-                    self.position += 2
-                    continue
 
                 if two_chars == "!=":
                     self.tokens.append(Token("NOT_EQUAL", "!=", self.line))

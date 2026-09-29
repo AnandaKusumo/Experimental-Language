@@ -1,4 +1,4 @@
-from parser import (Program, LetStatement, MoveStatement,ReignStatement,IfStatement, DepartStatement, ProceedStatement, UtterStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement)
+from parser import (Program, LetStatement, MoveStatement,ReignStatement,WhereStatement, DepartStatement, ProceedStatement, UtterStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement)
 
 class BreakSignal(Exception):
     pass
@@ -137,14 +137,12 @@ class Interpreter:
         if isinstance(statement, ProceedStatement):
             raise ContinueSignal()
 
-        if isinstance(statement, IfStatement):
-            condition = self.evaluate(statement.condition)
-
-            if condition:
+        if isinstance(statement, WhereStatement):
+            if self.evaluate(statement.condition):
                 self.execute_block(statement.then_branch)
                 return
 
-            for condition, body in statement.elif_branches:
+            for condition, body in statement.otherwise_branches:
                 if self.evaluate(condition):
                     self.execute_block(body)
                     return
@@ -209,7 +207,7 @@ class Interpreter:
         if node.operator == "SLASH":
             return left / right
 
-        if node.operator == "EQUAL_EQUAL":
+        if node.operator == "BE":
             return left == right
 
         if node.operator == "NOT_EQUAL":
