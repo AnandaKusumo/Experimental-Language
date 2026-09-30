@@ -17,10 +17,11 @@ KEYWORDS = {
     "otherwise": "OTHERWISE", # alternative branch of a condition
 
     # Loops
-    "reign": "REIGN",  # begin a loop
+    "reign": "REIGN",  # begin a conditional loop
     "depart": "DEPART",  # break out of a loop
     "proceed": "PROCEED",  # continue to the next iteration
     "wherein": "WHEREIN",  # membership or containment
+    "repeat": "REPEAT",  # to begin a loop for as many counts
 
     # Functions
     "ordain": "ORDAIN",  # define a function
@@ -38,7 +39,8 @@ KEYWORDS = {
     "affirm": "AFFIRM",  # assert that a condition is true
 
     # Logical & comparison operators
-    "naught": "NAUGHT",  # logical NOT
+    "naught": "NAUGHT",  # None
+    "ne": "NE",  # logical NOT
     "both": "BOTH",  # logical AND
     "either": "EITHER",  # logical OR
     "be": "BE",  # identity comparison
@@ -62,6 +64,10 @@ KEYWORDS = {
 
     # Aliases & miscellaneous
     "as": "AS",  # assign an alternative name
+
+    # Boolean expression
+    "truth": "TRUTH", # True
+    "nay": "NAY", # False
 }
 
 class Token:

@@ -36,6 +36,18 @@ class ReignStatement(ASTNode):
             f"{self.body!r})"
         )
 
+class RepeatStatement(ASTNode):
+    def __init__(self, count, body):
+        self.count = count
+        self.body = body
+
+    def __repr__(self):
+        return (
+            f"RepeatStatement("
+            f"{self.count!r},"
+            f"{self.body!r}"
+        )
+
 class WhereStatement(ASTNode):
     def __init__(self, condition, then_branch, otherwise_branches=None, else_branch=None):
         self.condition = condition
@@ -168,6 +180,18 @@ class SliceExpression(ASTNode):
             f"{self.end!r})"
         )
 
+class UnaryExpression(ASTNode):
+    def __init__(self, operator, expression):
+        self.operator = operator
+        self.expression = expression
+
+    def __repr__(self):
+        return (
+            f"UnaryExpression("
+            f"{self.operator!r},"
+            f"{self.expression!r}"
+        )
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -202,6 +226,9 @@ class Parser:
         
         if self.match("WHERE"):
             return self.where_statement()
+        
+        if self.match("REPEAT"):
+            return self.repeat_statement()
         
         if self.match("DEPART"):
             return DepartStatement()
@@ -293,6 +320,23 @@ class Parser:
 
         return WhereStatement(condition, then_branch, otherwise_branches, else_branch)
 
+    def repeat_statement(self):
+        self.consume(
+            "LEFT_PAREN",
+            "Expected '(' after repeat."
+        )
+
+        count = self.expression()
+
+        self.consume(
+            "RIGHT_PAREN",
+            "Expected ')' after repeat count."
+        )
+
+        body = self.block()
+
+        return RepeatStatement(count, body)
+
     def ordain_statement(self):
         name = self.consume(
             "IDENTIFIER",
@@ -332,6 +376,31 @@ class Parser:
         return OrdainStatement(name.value, parameters, body)
 
     def expression(self):
+        return self.either()
+
+    def either(self):
+        expression = self.both()
+
+        while self.match("EITHER"):
+            right = self.both()
+            expression = BinaryExpression(expression, "EITHER", right)
+
+        return expression
+
+    def both(self):
+        expression = self.negation()
+
+        while self.match("BOTH"):
+            right = self.negation()
+            expression = BinaryExpression(expression, "BOTH", right)
+
+        return expression
+
+    def negation(self):
+        if self.match("NE"):
+            expression = self.negation()
+            return UnaryExpression("NE", expression)
+
         return self.comparison()
 
     def comparison(self):
@@ -381,6 +450,15 @@ class Parser:
 
         if self.match("STRING"):
             return Literal(self.previous().value)
+
+        if self.match("TRUTH"):
+            return Literal(True)
+
+        if self.match("NAY"):
+            return Literal(False)
+
+        if self.match("NAUGHT"):
+            return Literal(None)
 
         if self.match("LEFT_BRACKET"):
             elements = []

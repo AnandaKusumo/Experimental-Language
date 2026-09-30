@@ -1,4 +1,4 @@
-from parser import (Program, LetStatement, MoveStatement,ReignStatement,WhereStatement, DepartStatement, ProceedStatement, UtterStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement)
+from parser import (Program, LetStatement, MoveStatement,ReignStatement, WhereStatement, RepeatStatement, DepartStatement, ProceedStatement, UtterStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement, UnaryExpression)
 
 class BreakSignal(Exception):
     pass
@@ -131,6 +131,25 @@ class Interpreter:
                     break
             return
 
+        if isinstance(statement, RepeatStatement):
+            count = self.evaluate(statement.count)
+
+            if not isinstance(count, int):
+                raise RuntimeError("repeat() expects an integer.")
+
+            if count < 0:
+                raise RuntimeError("repeat() expects a non-negative integer.")
+
+            for _ in range(count):
+                try:
+                    self.execute_block(statement.body)
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
+                    break
+
+            return
+
         if isinstance(statement, DepartStatement):
             raise BreakSignal()
         
@@ -189,6 +208,14 @@ class Interpreter:
         if isinstance(node, CallExpression):
             return self.evaluate_call(node)
 
+        if isinstance(node, UnaryExpression):
+            value = self.evaluate(node.expression)
+
+            if node.operator == "NE":
+                return not value
+
+            raise RuntimeError(f"Unknown unary operator: {node.operator}")
+
         raise RuntimeError(f"Unknown expression: {type(node).__name__}")
 
     def evaluate_binary(self, node):
@@ -224,6 +251,12 @@ class Interpreter:
 
         if node.operator == "GREATER_EQUAL":
             return left >= right
+
+        if node.operator == "BOTH":
+            return left and right
+
+        if node.operator == "EITHER":
+            return left or right
 
         raise RuntimeError(f"Unknown operator: {node.operator}")
 
