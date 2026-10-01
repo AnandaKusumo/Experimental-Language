@@ -290,7 +290,6 @@ class Lexer:
             self.position += 1
 
     def handle_indentation(self):
-        start = self.position
         spaces = 0
 
         while self.position < len(self.source):
@@ -308,6 +307,10 @@ class Lexer:
                 break
 
         if self.position >= len(self.source):
+            return
+
+        if self.source[self.position] == "\n":
+            self.at_line_start = False
             return
 
         if self.source[self.position] == "#":
