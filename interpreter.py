@@ -1,4 +1,4 @@
-from parser import (Program, LetStatement, MoveStatement,ReignStatement, WhereStatement, RepeatStatement, DepartStatement, ProceedStatement, UtterStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement, UnaryExpression)
+from parser import (Program, LetStatement, MoveStatement,ReignStatement, WhereStatement, RepeatStatement, DepartStatement, ProceedStatement, OrdainStatement, YieldStatement, Literal, ListLiteral, Identifier, BinaryExpression, IndexExpression, SliceExpression, CallExpression, ExpressionStatement, UnaryExpression)
 
 class BreakSignal(Exception):
     pass
@@ -114,11 +114,6 @@ class Interpreter:
             value = self.evaluate(statement.expression)
             raise ReturnSignal(value)
 
-        if isinstance(statement, UtterStatement):
-            value = self.evaluate(statement.expression)
-            print(value)
-            return
-        
         if isinstance(statement, ReignStatement):
             while self.evaluate(statement.condition):
                 try:
@@ -135,7 +130,7 @@ class Interpreter:
             count = self.evaluate(statement.count)
 
             if not isinstance(count, int):
-                raise RuntimeError("repeat() expects an integer.")
+                raise TypeError("repeat() expects an integer.")
 
             if count < 0:
                 raise RuntimeError("repeat() expects a non-negative integer.")
@@ -267,6 +262,10 @@ class Interpreter:
         function_name = node.callee.name
 
         arguments = [self.evaluate(argument) for argument in node.arguments]
+
+        if function_name == "utter":
+            print(*arguments)
+            return None
 
         if function_name == "inquire":
             if len(arguments) > 1:

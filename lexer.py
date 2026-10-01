@@ -4,7 +4,6 @@ KEYWORDS = {
     "move": "MOVE",  # change the value of a variable
 
     # Output & program control
-    "utter": "UTTER",  # display output
     "away": "AWAY",  # exit the program
     "clean": "CLEAN",  # clear the terminal
 

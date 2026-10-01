@@ -86,13 +86,6 @@ class ProceedStatement(ASTNode):
     def __repr__(self):
         return "ProceedStatement()"
 
-class UtterStatement(ASTNode):
-    def __init__(self, expression):
-        self.expression = expression
-
-    def __repr__(self):
-        return f"UtterStatement({self.expression!r})"
-
 class YieldStatement(ASTNode):
     def __init__(self, expression=None):
         self.expression = expression
@@ -209,9 +202,6 @@ class Parser:
         if self.match("LET"):
             return self.let_statement()
 
-        if self.match("UTTER"):
-            return self.utter_statement()
-        
         if self.match("MOVE"):
             return self.move_statement()
 
@@ -269,11 +259,6 @@ class Parser:
             name.value,
             value
         )
-
-    def utter_statement(self):
-        expression = self.expression()
-
-        return UtterStatement(expression)
 
     def move_statement(self):
         name = self.consume(
