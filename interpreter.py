@@ -275,6 +275,12 @@ class Interpreter:
             prompt = arguments[0] if arguments else ""
 
             return input(prompt)
+        
+        if function_name == "whole":
+            if len(arguments) != 1:
+                raise RuntimeError("whole() expects exactly one argument")
+
+            return int(arguments[0])
 
         try:
             function = self.environment.get(function_name)
